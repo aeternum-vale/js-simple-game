@@ -18,8 +18,6 @@ canvas.height = CANVAS_HEIGHT;
 var ctx = canvas.getContext('2d');
 
 
-
-
 var pressedButtons = {};
 var player = new Player();
 var map = new Map();
@@ -78,10 +76,10 @@ function Point(x, y) {
 	this.x = x || 0;
 	this.y = y || 0;
 
-	this.offset = function (point) {
+	/*this.offset = function (point) {
 		this.x += point.x;
 		this.y += point.y;
-	};
+	};*/
 	
 }
 
@@ -91,11 +89,11 @@ function Player() {
 	var LINE_WIDTH = 1;
 	var ALPHA = -70; //DEGREES
 	var BARREL_LENGTH = 10;
-	var AIM_DIST = 150;
-	var AIM_RADIUS = 10;
 
 	var BASE_RADIUS = RADIUS * 1.3;
 
+	var SPEED = 10;
+	var ROTATION_SPEED = 8;
 
 	var globalPosition = new Point(CANVAS_WIDTH/2, CANVAS_HEIGHT - RADIUS - LINE_WIDTH - BARREL_LENGTH);
 	var localPosition = new Point();
@@ -104,8 +102,7 @@ function Player() {
 	var p1 = new Point();
 
 	var angle = 0; //DEGREES
-	var speed = 10;
-	var rotationSpeed = 8;
+
 
 	var energyAmount = 15;
 	var energyStock = 0;
@@ -133,31 +130,31 @@ function Player() {
 	this.update = function () {
 
 		if (pressedButtons[LEFT_BUTTON])
-			angle -= rotationSpeed;
+			angle -= ROTATION_SPEED;
 			
 		if (pressedButtons[RIGHT_BUTTON])
-			angle += rotationSpeed;
+			angle += ROTATION_SPEED;
 			
 		if (pressedButtons[UP_BUTTON]) {
 			energyStock = energyAmount;
 			lastAngle = angle;
 
-			globalPosition.x += speed * Math.cos(degToRad(angle - 90));
-			globalPosition.y += speed * Math.sin(degToRad(angle - 90));
+			globalPosition.x += SPEED * Math.cos(degToRad(angle - 90));
+			globalPosition.y += SPEED * Math.sin(degToRad(angle - 90));
 		}
 
 		if (pressedButtons[DOWN_BUTTON]) {
 			energyStock = energyAmount;
 			lastAngle = angle + 180;
 
-			globalPosition.x -= speed * Math.cos(degToRad(angle - 90));
-			globalPosition.y -= speed * Math.sin(degToRad(angle - 90));
+			globalPosition.x -= SPEED * Math.cos(degToRad(angle - 90));
+			globalPosition.y -= SPEED * Math.sin(degToRad(angle - 90));
 		}
 
 		if (!pressedButtons[UP_BUTTON] && !pressedButtons[DOWN_BUTTON])
 		if (energyStock > 0) {
-			globalPosition.x += speed * (energyStock/energyAmount) * Math.cos(degToRad(lastAngle - 90));
-			globalPosition.y += speed * (energyStock/energyAmount) * Math.sin(degToRad(lastAngle - 90));
+			globalPosition.x += SPEED * (energyStock/energyAmount) * Math.cos(degToRad(lastAngle - 90));
+			globalPosition.y += SPEED * (energyStock/energyAmount) * Math.sin(degToRad(lastAngle - 90));
 			energyStock--;
 		}
 
@@ -227,10 +224,12 @@ function Player() {
 
 	function Aim() {
 
-		var coords = new Point();
-		var aimAngle = 0;
+		var AIM_DIST = 150;
+		var AIM_RADIUS = 10;
 		var AIM_ROTATION_SPEED = 10;
 
+		var coords = new Point();
+		var aimAngle = 0;
 
 		this.draw = function() {
 			ctx.save();
@@ -275,7 +274,7 @@ function Player() {
 
 function Map() {
 
-	var segmentSize = 100;
+	var SEGMENT_SIZE = 100;
 	var startPoint = new Point();
 
 
@@ -283,8 +282,8 @@ function Map() {
 		var g = player.getGlobalPosition();
 		var l = player.getLocalPosition();
 
-		startPoint.x = segmentSize - ((g.x - l.x) % segmentSize);
-		startPoint.y = segmentSize - ((g.y - l.y) % segmentSize);
+		startPoint.x = SEGMENT_SIZE - ((g.x - l.x) % SEGMENT_SIZE);
+		startPoint.y = SEGMENT_SIZE - ((g.y - l.y) % SEGMENT_SIZE);
 	};
 
 	this.draw = function () {
@@ -295,12 +294,12 @@ function Map() {
 
 		ctx.beginPath();
 
-		for (var i = 0; i < CANVAS_WIDTH / segmentSize; i++) {
-			ctx.moveTo(startPoint.x + i * segmentSize, 0);
-			ctx.lineTo(startPoint.x + i * segmentSize, CANVAS_HEIGHT);
+		for (var i = 0; i < CANVAS_WIDTH / SEGMENT_SIZE; i++) {
+			ctx.moveTo(startPoint.x + i * SEGMENT_SIZE, 0);
+			ctx.lineTo(startPoint.x + i * SEGMENT_SIZE, CANVAS_HEIGHT);
 
-			ctx.moveTo(0, startPoint.y + i * segmentSize);
-			ctx.lineTo(CANVAS_WIDTH, startPoint.y + i * segmentSize);
+			ctx.moveTo(0, startPoint.y + i * SEGMENT_SIZE);
+			ctx.lineTo(CANVAS_WIDTH, startPoint.y + i * SEGMENT_SIZE);
 		}
 
 		ctx.stroke();
