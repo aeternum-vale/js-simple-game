@@ -134,6 +134,8 @@ function Player() {
 			
 		if (pressedButtons[RIGHT_BUTTON])
 			angle += ROTATION_SPEED;
+
+		angle %= 360;
 			
 		if (pressedButtons[UP_BUTTON]) {
 			energyStock = energyAmount;
@@ -226,6 +228,7 @@ function Player() {
 
 		var AIM_DIST = 150;
 		var AIM_RADIUS = 10;
+		var AIM_SMALL_RADIUS = AIM_RADIUS * .6;
 		var AIM_ROTATION_SPEED = 10;
 
 		var coords = new Point();
@@ -243,7 +246,7 @@ function Player() {
 			ctx.translate(coords.x, coords.y);
 
 			ctx.beginPath();
-			ctx.arc(0, 0, AIM_RADIUS * .6, 0, Math.PI * 2);
+			ctx.arc(0, 0, AIM_SMALL_RADIUS, 0, Math.PI * 2);
 			ctx.stroke();
 
 
@@ -265,6 +268,7 @@ function Player() {
 
 
 			aimAngle -= AIM_ROTATION_SPEED;
+			aimAngle %= 360;
 
 		};
 	}
