@@ -21,7 +21,7 @@ var ctx = canvas.getContext('2d');
 
 
 var pressedButtons = {};
-var gun = new Gun();
+var player = new Player();
 var map = new Map();
 
 window.onkeydown = function (e) {
@@ -57,12 +57,12 @@ function drawFrame() {
 function draw() {
 	clearScreen();
 	map.draw();
-	gun.draw();
+	player.draw();
 	drawFrame();
 }
 
 function update() {
-	gun.update();
+	player.update();
 	map.update();
 }
 
@@ -85,7 +85,7 @@ function Point(x, y) {
 	
 }
 
-function Gun() {
+function Player() {
 
 	var RADIUS = 10;
 	var LINE_WIDTH = 1;
@@ -280,8 +280,8 @@ function Map() {
 
 
 	this.update = function () {
-		var g = gun.getGlobalPosition();
-		var l = gun.getLocalPosition();
+		var g = player.getGlobalPosition();
+		var l = player.getLocalPosition();
 
 		startPoint.x = segmentSize - ((g.x - l.x) % segmentSize);
 		startPoint.y = segmentSize - ((g.y - l.y) % segmentSize);
