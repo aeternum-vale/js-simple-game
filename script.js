@@ -7,6 +7,7 @@ var LEFT_BUTTON = 37;
 var UP_BUTTON = 38;
 var RIGHT_BUTTON = 39;
 var DOWN_BUTTON = 40;
+var SHOOT_BUTTON = 17;
 
 var GLOBAL_WIDTH = 2000;
 var GLOBAL_HEIGHT = 2000;
@@ -62,6 +63,15 @@ function draw() {
 function update() {
 	player.update();
 	map.update();
+
+	/*
+	var val = "";
+	for (var key in pressedButtons) {
+		if (pressedButtons[key])
+			val += key + " ";
+	}
+	console.log(val);
+	*/
 }
 
 function degToRad(angle) {
@@ -76,10 +86,10 @@ function Point(x, y) {
 	this.x = x || 0;
 	this.y = y || 0;
 
-	/*this.offset = function (point) {
+	this.offset = function (point) {
 		this.x += point.x;
 		this.y += point.y;
-	};*/
+	};
 	
 }
 
@@ -87,13 +97,17 @@ function Player() {
 
 	var RADIUS = 10;
 	var LINE_WIDTH = 1;
-	var ALPHA = -70; //DEGREES
+	var ALPHA = -70;
 	var BARREL_LENGTH = 10;
 
 	var BASE_RADIUS = RADIUS * 1.3;
 
-	var SPEED = 10;
+
 	var ROTATION_SPEED = 8;
+
+	var RIDING_ENERGY_AMOUNT = 15;
+	var SHOOTING_ENERGY_AMOUNT = 30;
+
 
 	var globalPosition = new Point(CANVAS_WIDTH/2, CANVAS_HEIGHT - RADIUS - LINE_WIDTH - BARREL_LENGTH);
 	var localPosition = new Point();
@@ -101,15 +115,14 @@ function Player() {
 	var p0 = new Point();
 	var p1 = new Point();
 
-	var angle = 0; //DEGREES
+	var angle = 0;
 
 
-	var energyAmount = 15;
-	var energyStock = 0;
-	var lastAngle = 0;
+
 
 	var aim = new Aim();
 
+	/*
 	this.setAngle = function(_angle) {
 		angle = _angle;
 	};
@@ -117,6 +130,7 @@ function Player() {
 	this.getAngle = function() {
 		return angle;
 	};
+	*/
 
 
 	this.getGlobalPosition = function() {
@@ -127,6 +141,34 @@ function Player() {
 		return localPosition;
 	};
 
+
+	var impulses = [];
+	function Impulse (energyAmount, angle) {
+		var REDUCE_RATE = .1;
+		var energyStock = energyAmount;
+
+		this.reduceEnergyStock = function () {
+
+			energyStock -= REDUCE_RATE * energyStock;
+			return energyStock >= 1;
+		};
+
+		this.getOffsetVector = function () {
+			var length = energyStock;//MAX_SPEED * (energyStock/energyAmount);
+			return new Point(length * Math.cos(degToRad(angle)), length * Math.sin(degToRad(angle)));
+		};
+	}
+
+
+	var upButtonPressed = false;
+	var downButtonPressed = false;
+	var shootButtonPressed = false;
+
+	var MAX_SPEED = 10;
+	var SPEED_INCREASE = 1.3;
+	var currentSpeed = 0;
+
+	
 	this.update = function () {
 
 		if (pressedButtons[LEFT_BUTTON])
@@ -136,29 +178,72 @@ function Player() {
 			angle += ROTATION_SPEED;
 
 		angle %= 360;
-			
-		if (pressedButtons[UP_BUTTON]) {
-			energyStock = energyAmount;
-			lastAngle = angle;
 
-			globalPosition.x += SPEED * Math.cos(degToRad(angle - 90));
-			globalPosition.y += SPEED * Math.sin(degToRad(angle - 90));
+
+
+		if (pressedButtons[UP_BUTTON] || pressedButtons[DOWN_BUTTON]) {
+			if (currentSpeed == 0)
+				currentSpeed = 1;
+			else
+				currentSpeed *= SPEED_INCREASE;
+
+			if (currentSpeed > MAX_SPEED)
+				currentSpeed = MAX_SPEED;
+		}
+
+		if (pressedButtons[UP_BUTTON]) {
+			upButtonPressed = true;
+
+			globalPosition.x += currentSpeed * Math.cos(degToRad(angle - 90));
+			globalPosition.y += currentSpeed * Math.sin(degToRad(angle - 90));
 		}
 
 		if (pressedButtons[DOWN_BUTTON]) {
-			energyStock = energyAmount;
-			lastAngle = angle + 180;
+			downButtonPressed = true;
 
-			globalPosition.x -= SPEED * Math.cos(degToRad(angle - 90));
-			globalPosition.y -= SPEED * Math.sin(degToRad(angle - 90));
+			globalPosition.x += currentSpeed * Math.cos(degToRad(angle + 90));
+			globalPosition.y += currentSpeed * Math.sin(degToRad(angle + 90));
 		}
 
-		if (!pressedButtons[UP_BUTTON] && !pressedButtons[DOWN_BUTTON])
-		if (energyStock > 0) {
-			globalPosition.x += SPEED * (energyStock/energyAmount) * Math.cos(degToRad(lastAngle - 90));
-			globalPosition.y += SPEED * (energyStock/energyAmount) * Math.sin(degToRad(lastAngle - 90));
-			energyStock--;
+		if (!pressedButtons[UP_BUTTON] && upButtonPressed) {
+			upButtonPressed = false;
+			impulses.push(new Impulse(currentSpeed, angle - 90));
+			currentSpeed = 0;
 		}
+
+		if (!pressedButtons[DOWN_BUTTON] && downButtonPressed) {
+			downButtonPressed = false;
+			impulses.push(new Impulse(currentSpeed, angle + 90));
+			currentSpeed = 0;
+		}
+
+		//shooting
+
+		if (pressedButtons[SHOOT_BUTTON] && !shootButtonPressed) {
+			shootButtonPressed = true;
+			impulses.push(new Impulse(SHOOTING_ENERGY_AMOUNT, angle + 90));
+		}
+
+		if (!pressedButtons[SHOOT_BUTTON]) {
+			shootButtonPressed = false;
+		}
+
+
+		//impulses
+
+
+		for (var i = 0; i < impulses.length; i++) {
+			globalPosition.offset(impulses[i].getOffsetVector());
+
+			if (!impulses[i].reduceEnergyStock())
+				impulses.splice(i--, 1);
+		}
+
+
+		//collisions
+
+		
+
 
 		//getting local coords
 
@@ -181,7 +266,6 @@ function Player() {
 		}
 
 		p0.x = RADIUS * Math.cos(degToRad(ALPHA));
-
 		p0.y = RADIUS * Math.sin(degToRad(ALPHA));
 		p1.x = RADIUS * Math.cos(Math.PI - degToRad(ALPHA));
 		p1.y = RADIUS * Math.sin(Math.PI - degToRad(ALPHA));
