@@ -32,9 +32,16 @@ window.onkeyup = function (e) {
 	delete pressedButtons[e.keyCode];
 };
 
+var prevTime = 0;
+var fps = document.getElementById("fps");
+
 setInterval(function () {
 	update();
 	draw();
+
+	fps.textContent = (1000/(performance.now() - prevTime)).toFixed(2);
+	prevTime = performance.now();
+
 }, 40);
 
 function clearScreen() {
@@ -504,7 +511,7 @@ function Explosion(globalPosition) {
 			currentGlowColor.l = getTransitionalValue(startGlowColor.l, endGlowColor.l, currentFrame/LIFETIME);
 
 			textGlowColor = currentGlowColor.getStr(glowOpacity);
-			
+
 		};
 
 
