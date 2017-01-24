@@ -398,13 +398,19 @@ function Explosion(globalPosition) {
 
 	var fbAmount = randomInteger(10, 20);
 	for (var i = 0; i < fbAmount; i++)
-		participles.push(new Participle( Math.random() * 360 / fbAmount + i * 360 / fbAmount, Math.random() * 4 + 6, Math.random() * 2 + 1));
+		participles.push(new Participle( Math.random() * 360 / fbAmount + i * 360 / fbAmount, Math.random() * 4 + 6,
+			Math.random() * 2 + 1));
 
 	var fbAmount = randomInteger(50, 90);
 	for (var i = 0; i < fbAmount; i++)
-		participles.push(new Participle( Math.random() * 360 / fbAmount + i * 360 / fbAmount, Math.random() * 4 + 1, Math.random() * 6 + 3));
+		participles.push(new Participle( Math.random() * 360 / fbAmount + i * 360 / fbAmount, Math.random() * 4 + 1,
+			Math.random() * 6 + 3));
 
 
+	var textGlowColor;
+	var startGlowColor = new HSLColor(34, 93, 51);
+	var currentGlowColor = new HSLColor();
+	var endGlowColor = new HSLColor(7, 100, 9);
 
 
 	this.update = function() {
@@ -435,26 +441,22 @@ function Explosion(globalPosition) {
 
 	this.draw = function() {
 		// ctx.save();
-        //
-        //
 		// ctx.fillStyle = "#F4FA58";
 		// ctx.globalAlpha = glowOpacity;
-        //
 		// ctx.translate(localPosition.x, localPosition.y);
-        //
 		// ctx.beginPath();
 		// ctx.arc(0, 0, currentRadius, 0, Math.PI * 2);
-        //
-        //
 		// //ctx.fill();
-        //
 		// ctx.lineWidth = 15 * glowOpacity;
 		// ctx.strokeStyle = "yellow";
 		// ctx.stroke();
-        //
-        //
-        //
 		// ctx.restore();
+
+		currentGlowColor.h = getTransitionalValue(startGlowColor.h, endGlowColor.h, currentFrame/LIFETIME);
+		currentGlowColor.s = getTransitionalValue(startGlowColor.s, endGlowColor.s, currentFrame/LIFETIME);
+		currentGlowColor.l = getTransitionalValue(startGlowColor.l, endGlowColor.l, currentFrame/LIFETIME);
+		textGlowColor = currentGlowColor.getStr(glowOpacity);
+
 
 		for (var i = 0; i < participles.length; i++)
 			participles[i].drawGlow();
@@ -465,52 +467,34 @@ function Explosion(globalPosition) {
 	};
 
 
+
+	function getTransitionalValue(start, end, percent) {
+		var shift = Math.abs(start - end) * percent;
+
+		if (start < end)
+			return start + shift;
+		else
+			return start - shift;
+	}
+
 	function Participle(angle, speed, radius) {
 
 		var maxSpeed = speed || 5;
-		var radius = radius || 5;
-
+		radius = radius || 5;
 
 		var curSpeed = 0;
 
 		var fbGlobalPosition = new Point(globalPosition.x, globalPosition.y);
 		var localPosition = new Point();
 
-
-		var textGlowColor;
-
-		var startGlowColor = new HSLColor(34, 93, 51);
-		var currentGlowColor = new HSLColor();
-		var endGlowColor = new HSLColor(7, 100, 9);
-
-
-
-		function getTransitionalValue(start, end, percent) {
-			var shift = Math.abs(start - end) * percent;
-
-			if (start < end)
-				return start + shift;
-			else
-				return start - shift;
-
-		}
-
 		this.update = function() {
 
 			curSpeed = Math.cos(Math.PI/2 * currentFrame/LIFETIME) * maxSpeed;
-
 
 			fbGlobalPosition.x += curSpeed * Math.cos(degToRad(angle));
 			fbGlobalPosition.y += curSpeed * Math.sin(degToRad(angle));
 
 			getLocalPositionByGlobal(localPosition, fbGlobalPosition);
-
-
-			currentGlowColor.h = getTransitionalValue(startGlowColor.h, endGlowColor.h, currentFrame/LIFETIME);
-			currentGlowColor.s = getTransitionalValue(startGlowColor.s, endGlowColor.s, currentFrame/LIFETIME);
-			currentGlowColor.l = getTransitionalValue(startGlowColor.l, endGlowColor.l, currentFrame/LIFETIME);
-
-			textGlowColor = currentGlowColor.getStr(glowOpacity);
 
 		};
 
