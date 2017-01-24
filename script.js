@@ -74,15 +74,6 @@ function update() {
 			explosions.splice(i--, 1);
 
 	map.update();
-
-	/*
-	var val = "";
-	for (var key in pressedButtons) {
-		if (pressedButtons[key])
-			val += key + " ";
-	}
-	console.log(val);
-	*/
 }
 
 function degToRad(angle) {
@@ -91,6 +82,12 @@ function degToRad(angle) {
 
 function radToDeg(angle) {
 	return angle * 180 / Math.PI;
+}
+
+function randomInteger(min, max) {
+	var rand = min + Math.random() * (max - min);
+	rand = Math.round(rand);
+	return rand;
 }
 
 function Point(x, y) {
@@ -104,6 +101,12 @@ function Point(x, y) {
 
 }
 
+
+function getLocalPositionByGlobal(localPosition, globalPosition) {
+	var vagp = player.getVisibleAreaGlobalPosition();
+	localPosition.x =  globalPosition.x - vagp.x;
+	localPosition.y =  globalPosition.y - vagp.y;
+}
 
 
 
@@ -370,36 +373,52 @@ function Player() {
 
 function Explosion(globalPosition) {
 
-	var LIFETIME = 10;
+	var LIFETIME = 15;
 	var MAX_RADIUS = 100;
 
 	var currentFrame = 0;
 	var currentRadius;
-	var opacity = 1;
+	var glowOpacity = 1;
+	var participleOpacity = 1;
+
+
+
 
 	var localPosition = new Point();
 
-	var fbAmount = randomInteger(6, 10);
-	var firebolts = [];
 
+	var participles = [];
+
+	var fbAmount = randomInteger(10, 20);
 	for (var i = 0; i < fbAmount; i++)
-		firebolts.push(new Firebolt( Math.random() * 360 / fbAmount + i * 360 / fbAmount ));
+		participles.push(new Participle( Math.random() * 360 / fbAmount + i * 360 / fbAmount, Math.random() * 4 + 6, Math.random() * 2 + 1));
+
+	var fbAmount = randomInteger(50, 90);
+	for (var i = 0; i < fbAmount; i++)
+		participles.push(new Participle( Math.random() * 360 / fbAmount + i * 360 / fbAmount, Math.random() * 4 + 1, Math.random() * 6 + 3));
+
+
 
 
 	this.update = function() {
 
-		var vagp = player.getVisibleAreaGlobalPosition();
-		localPosition.x =  globalPosition.x - vagp.x;
-		localPosition.y =  globalPosition.y - vagp.y;
-
+		getLocalPositionByGlobal(localPosition, globalPosition);
 		currentRadius = MAX_RADIUS * currentFrame/LIFETIME;
 
-		if  (currentFrame/LIFETIME >= .7)
-			opacity = 1 - ((currentFrame/LIFETIME - .7) * 10/3);
+
+		var GLOW_OPACITY_BORDER = .7;
+		var PARTICIPLE_OPACITY_BORDER = .5;
+
+		if  (currentFrame/LIFETIME >= GLOW_OPACITY_BORDER)
+			glowOpacity = 1 - ((currentFrame/LIFETIME - GLOW_OPACITY_BORDER) * (1/(1 - GLOW_OPACITY_BORDER)));
+
+		if  (currentFrame/LIFETIME >= PARTICIPLE_OPACITY_BORDER)
+			participleOpacity = 1 - ((currentFrame/LIFETIME - PARTICIPLE_OPACITY_BORDER) *
+				(1/(1 - PARTICIPLE_OPACITY_BORDER)));
 
 
-		for (var i = 0; i < firebolts.length; i++)
-			firebolts[i].update();
+		for (var i = 0; i < participles.length; i++)
+			participles[i].update();
 
 
 		if (currentFrame++ >= LIFETIME)
@@ -408,83 +427,121 @@ function Explosion(globalPosition) {
 	};
 
 	this.draw = function() {
-		ctx.save();
+		// ctx.save();
+        //
+        //
+		// ctx.fillStyle = "#F4FA58";
+		// ctx.globalAlpha = glowOpacity;
+        //
+		// ctx.translate(localPosition.x, localPosition.y);
+        //
+		// ctx.beginPath();
+		// ctx.arc(0, 0, currentRadius, 0, Math.PI * 2);
+        //
+        //
+		// //ctx.fill();
+        //
+		// ctx.lineWidth = 15 * glowOpacity;
+		// ctx.strokeStyle = "yellow";
+		// ctx.stroke();
+        //
+        //
+        //
+		// ctx.restore();
 
+		for (var i = 0; i < participles.length; i++)
+			participles[i].drawGlow();
 
-		ctx.fillStyle = "#F4FA58";
-		ctx.globalAlpha = opacity;
-
-		ctx.translate(localPosition.x, localPosition.y);
-
-		ctx.beginPath();
-		ctx.arc(0, 0, currentRadius, 0, Math.PI * 2);
-
-
-		//ctx.fill();
-
-		ctx.lineWidth = 15 * opacity;
-		ctx.strokeStyle = "yellow";
-		ctx.stroke();
-
-
-
-		ctx.restore();
-
-		for (var i = 0; i < firebolts.length; i++)
-			firebolts[i].draw();
+		for (var i = 0; i < participles.length; i++)
+			participles[i].drawParticiple();
 
 	};
 
 
-	function Firebolt(angle) {
+	function Participle(angle, speed, radius) {
 
-		var speed = Math.random() * 15 + 5; //15;
-
-		var fbLocalPosition = new Point();
-
-		var glowd = Math.random() * 10 + 20;//25;
-		var h1, h2;
+		var maxSpeed = speed || 5;
+		var radius = radius || 5;
 
 
-		var gradient;
+		var curSpeed = 0;
+
+		var fbGlobalPosition = new Point(globalPosition.x, globalPosition.y);
+		var localPosition = new Point();
+
+
+		var textGlowColor;
+
+		var startGlowColor = new HSLColor(34, 93, 51);
+		var currentGlowColor = new HSLColor();
+		var endGlowColor = new HSLColor(7, 100, 9);
+
+
+
+		function getTransitionalValue(start, end, percent) {
+			var shift = Math.abs(start - end) * percent;
+
+			if (start < end)
+				return start + shift;
+			else
+				return start - shift;
+
+		}
 
 		this.update = function() {
 
-			fbLocalPosition.x = localPosition.x + currentFrame * speed * Math.cos(degToRad(angle));
-			fbLocalPosition.y = localPosition.y + currentFrame * speed * Math.sin(degToRad(angle));
+			curSpeed = Math.cos(Math.PI/2 * currentFrame/LIFETIME) * maxSpeed;
 
-			h1 = new Point(fbLocalPosition.x + glowd * Math.cos(degToRad(angle + 90)),
-				fbLocalPosition.y + glowd * Math.sin(degToRad(angle + 90)));
 
-			h2 = new Point(fbLocalPosition.x + glowd * Math.cos(degToRad(angle - 90)),
-				fbLocalPosition.y + glowd * Math.sin(degToRad(angle - 90)));
+			fbGlobalPosition.x += curSpeed * Math.cos(degToRad(angle));
+			fbGlobalPosition.y += curSpeed * Math.sin(degToRad(angle));
 
+			getLocalPositionByGlobal(localPosition, fbGlobalPosition);
+
+
+			currentGlowColor.h = getTransitionalValue(startGlowColor.h, endGlowColor.h, currentFrame/LIFETIME);
+			currentGlowColor.s = getTransitionalValue(startGlowColor.s, endGlowColor.s, currentFrame/LIFETIME);
+			currentGlowColor.l = getTransitionalValue(startGlowColor.l, endGlowColor.l, currentFrame/LIFETIME);
+
+			textGlowColor = currentGlowColor.getStr(glowOpacity);
+			
 		};
 
 
-		this.draw = function() {
+
+		this.drawGlow = function () {
 			ctx.save();
 
+			ctx.globalAlpha = glowOpacity;
 
-			ctx.globalAlpha = opacity;
-
-			gradient = ctx.createRadialGradient(fbLocalPosition.x, fbLocalPosition.y, 10,
-				fbLocalPosition.x, fbLocalPosition.y, currentFrame * speed);
-			gradient.addColorStop(0, "hsl(30,93%,60%)");
-			gradient.addColorStop(1, "hsl(63,91%,50%)");
-			ctx.fillStyle = gradient;
+			ctx.shadowBlur = 10;
+			ctx.shadowColor = textGlowColor;
+			ctx.fillStyle = textGlowColor;
 
 			ctx.beginPath();
-			ctx.moveTo(localPosition.x, localPosition.y);
-			ctx.bezierCurveTo(h2.x, h2.y, fbLocalPosition.x, fbLocalPosition.y, fbLocalPosition.x, fbLocalPosition.y);
-			ctx.bezierCurveTo(h1.x, h1.y, localPosition.x, localPosition.y,  localPosition.x, localPosition.y);
+
+			ctx.arc(localPosition.x, localPosition.y, radius, 0, Math.PI * 2);
 			ctx.fill();
+
 
 			ctx.restore();
 		};
 
-	}
 
+
+		this.drawParticiple = function() {
+			ctx.save();
+
+			ctx.globalAlpha = participleOpacity;
+			ctx.fillStyle = "white";
+
+			ctx.beginPath();
+			ctx.arc(localPosition.x, localPosition.y, radius, 0, Math.PI * 2);
+			ctx.fill();
+
+			ctx.restore();
+		};
+	}
 }
 
 function Map() {
@@ -517,14 +574,16 @@ function Map() {
 		}
 
 		ctx.stroke();
-
 		ctx.restore();
 	};
-
 }
 
-function randomInteger(min, max) {
-	var rand = min + Math.random() * (max - min)
-	rand = Math.round(rand);
-	return rand;
+function HSLColor (h, s, l) {
+	this.h = h || 0;
+	this.s = s || 0;
+	this.l = l || 0;
+
+	this.getStr = function (alpha) {
+		return "hsla(" + this.h + "," + this.s + "%," + this.l + "%," + alpha.toFixed(2) + ")";
+	};
 }
