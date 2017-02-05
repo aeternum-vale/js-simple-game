@@ -22,6 +22,7 @@ var player;
 var enemy;
 var map;
 var explosions;
+var machines;
 
 var prevTime;
 var fps;
@@ -39,6 +40,7 @@ function init(){
     enemy = new Enemy();
     map = new Map();
     explosions = [];
+    machines = [player, enemy];
 
     prevTime = 0;
     fps = document.getElementById("fps");
@@ -94,6 +96,7 @@ function draw() {
 }
 
 function update() {
+    Machine.detectColisions();
     player.update();
     enemy.update();
 
@@ -117,6 +120,11 @@ function randomInteger(min, max) {
     var rand = min + Math.random() * (max - min);
     rand = Math.round(rand);
     return rand;
+}
+
+
+function getDistanceBetweenTwoPoints(p1, p2) {
+    return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
 }
 
 function Point(x, y) {
@@ -159,9 +167,11 @@ function Machine() {
     this._angle = 0;
     this._impulses = [];
     this._currentSpeed = 0;
+    this._radius = 10;
+
+    this._colision = null;
 }
 
-Machine.prototype.RADIUS = 10;
 Machine.prototype.DRAWING_LINE_WIDTH = 1;
 Machine.prototype.BASE_RADIUS = 13;
 Machine.prototype.SHOOTING_ENERGY_AMOUNT = 15;
@@ -176,6 +186,21 @@ Machine.prototype._updateImpulses = function () {
     }
 };
 
+Machine.detectColisions = function() {
+
+    for (var i = 0; i < machines.length; i++)
+        machines[i]._colision = null;
+
+    for (i = 0; i < machines.length; i++) {
+        for (var j = i + 1; j < machines.length; j++) {
+            if (getDistanceBetweenTwoPoints(machines[i]._globalPosition, machines[j]._globalPosition) <
+                    2 * (machines[i]._radius + machines[j]._radius)) {
+                machines[i]._colision =  machines[j];
+                machines[j]._colision =  machines[i];
+            }
+        }
+    }
+};
 
 Machine.prototype.update = function () {
 
@@ -185,6 +210,34 @@ Machine.prototype.draw = function () {
 };
 
 
+Machine.prototype.getLocalPosition = function () {
+    return this._localPosition;
+};
+
+Machine.prototype.getAngle = function () {
+    return this._angle;
+};
+
+
+
+Machine.prototype._drawBoundaries = function () {
+    ctx.save();
+
+
+    if (this._colision)
+        ctx.strokeStyle = "red";
+    else
+        ctx.strokeStyle = "blue";
+
+    ctx.translate(this._localPosition.x, this._localPosition.y);
+
+    ctx.beginPath();
+    ctx.arc(0, 0, this._radius * 2, 0, Math.PI * 2);
+
+    ctx.stroke();
+
+    ctx.restore();
+};
 
 
 
@@ -195,14 +248,27 @@ Enemy.prototype.constructor = Enemy;
 function Enemy() {
     Machine.apply(this, arguments);
     this._globalPosition = new Point(440, 440);
+    this._currentSpeed = 5;
+    this._radius = 7;
 }
+
+Enemy.prototype._radius = 7;
 
 
 Enemy.prototype.update = function () {
     getLocalPositionByGlobal(this._localPosition, this._globalPosition);
+    this._angle += this.ROTATION_SPEED;
+
+    this._globalPosition.x += this._currentSpeed * Math.cos(degToRad(this._angle - 90));
+    this._globalPosition.y += this._currentSpeed * Math.sin(degToRad(this._angle - 90));
+
+
+    this._updateImpulses();
 };
 
 Enemy.prototype.draw = function () {
+
+    var offset = -this._radius * 0.5;
 
     ctx.save();
 
@@ -213,16 +279,17 @@ Enemy.prototype.draw = function () {
     ctx.fillStyle = "#BADA55";
     ctx.strokeStyle = "#000";
 
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(this.RADIUS * 1.5, this.RADIUS);
-    ctx.lineTo(this.RADIUS * 2, 0);
-    ctx.lineTo(this.RADIUS * 1.9, this.RADIUS * 1.75);
-    ctx.lineTo(0, this.RADIUS * 1.5);
 
-    ctx.lineTo(-this.RADIUS * 1.9, this.RADIUS * 1.75);
-    ctx.lineTo(-this.RADIUS * 2, 0);
-    ctx.lineTo(-this.RADIUS * 1.5, this.RADIUS);
+    ctx.beginPath();
+    ctx.moveTo(0, 0 + offset);
+    ctx.lineTo(this._radius * 1.5, this._radius + offset);
+    ctx.lineTo(this._radius * 2 , 0 + offset);
+    ctx.lineTo(this._radius * 1.9, this._radius * 1.75 + offset);
+    ctx.lineTo(0, this._radius * 1.5 + offset);
+
+    ctx.lineTo(-this._radius * 1.9, this._radius * 1.75 + offset);
+    ctx.lineTo(-this._radius * 2, 0 + offset);
+    ctx.lineTo(-this._radius * 1.5, this._radius + offset);
 
     ctx.closePath();
     ctx.fill();
@@ -230,17 +297,23 @@ Enemy.prototype.draw = function () {
 
 
     ctx.beginPath();
-    ctx.moveTo(-this.RADIUS, 0);
-    ctx.quadraticCurveTo(-this.RADIUS, this.RADIUS, 0, this.RADIUS * 2);
-    ctx.quadraticCurveTo(this.RADIUS, this.RADIUS, this.RADIUS, 0);
-    ctx.arc(0, 0, this.RADIUS, 0, -Math.PI, true);
+    ctx.moveTo(-this._radius, 0 + offset);
+    ctx.quadraticCurveTo(-this._radius, this._radius + offset, 0, this._radius * 2 + offset);
+    ctx.quadraticCurveTo(this._radius, this._radius + offset, this._radius, 0 + offset);
+    ctx.arc(0, 0 + offset, this._radius, 0, -Math.PI, true);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
 
     ctx.restore();
+
+
+    this._drawBoundaries();
 };
+
+
+
 
 
 
@@ -252,8 +325,7 @@ Player.prototype.constructor = Player;
 function Player() {
 
     Machine.apply(this, arguments);
-
-    this._globalPosition = new Point(CANVAS_WIDTH / 2, CANVAS_HEIGHT - this.RADIUS - this.DRAWING_LINE_WIDTH - this.BARREL_LENGTH);
+    this._globalPosition = new Point(CANVAS_WIDTH / 2, CANVAS_HEIGHT - this._radius - this.DRAWING_LINE_WIDTH - this.BARREL_LENGTH);
 
     this._p0 = new Point();
     this._p1 = new Point();
@@ -274,19 +346,9 @@ Player.prototype.getVisibleAreaGlobalPosition = function () {
     return new Point(this._globalPosition.x -  this._localPosition.x,  this._globalPosition.y - this._localPosition.y);
 };
 
-Player.prototype.getLocalPosition = function () {
-    return this._localPosition;
-};
-
-Player.prototype.getAngle = function () {
-    return this._angle;
-};
-
-
-
 
 Player.prototype.update = function () {
-
+    
     if (pressedButtons[LEFT_BUTTON])
         this._angle -= this.ROTATION_SPEED;
 
@@ -374,10 +436,10 @@ Player.prototype.update = function () {
             this._localPosition.y = this._globalPosition.y - (GLOBAL_HEIGHT - CANVAS_HEIGHT);
     }
 
-    this._p0.x = this.RADIUS * Math.cos(degToRad(this.BARREL_WIDTH_ANGLE));
-    this._p0.y = this.RADIUS * Math.sin(degToRad(this.BARREL_WIDTH_ANGLE));
-    this._p1.x = this.RADIUS * Math.cos(Math.PI - degToRad(this.BARREL_WIDTH_ANGLE));
-    this._p1.y = this.RADIUS * Math.sin(Math.PI - degToRad(this.BARREL_WIDTH_ANGLE));
+    this._p0.x = this._radius * Math.cos(degToRad(this.BARREL_WIDTH_ANGLE));
+    this._p0.y = this._radius * Math.sin(degToRad(this.BARREL_WIDTH_ANGLE));
+    this._p1.x = this._radius * Math.cos(Math.PI - degToRad(this.BARREL_WIDTH_ANGLE));
+    this._p1.y = this._radius * Math.sin(Math.PI - degToRad(this.BARREL_WIDTH_ANGLE));
 
     this._aim.update();
 };
@@ -404,7 +466,7 @@ Player.prototype.draw = function () {
     ctx.beginPath();
     ctx.moveTo(this._p0.x, this._p0.y - this.BARREL_LENGTH);
     ctx.lineTo(this._p0.x, this._p0.y);
-    ctx.arc(0, 0, this.RADIUS, degToRad(this.BARREL_WIDTH_ANGLE), Math.PI - degToRad(this.BARREL_WIDTH_ANGLE));
+    ctx.arc(0, 0, this._radius, degToRad(this.BARREL_WIDTH_ANGLE), Math.PI - degToRad(this.BARREL_WIDTH_ANGLE));
     ctx.lineTo(this._p1.x, this._p1.y - this.BARREL_LENGTH);
     ctx.closePath();
 
@@ -414,6 +476,8 @@ Player.prototype.draw = function () {
     ctx.restore();
 
     this._aim.draw();
+
+    this._drawBoundaries();
 };
 
 
