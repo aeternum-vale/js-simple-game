@@ -582,9 +582,9 @@ function Explosion(globalPosition) {
 
     var LIFETIME = 15;
     var MAX_RADIUS = 100;
-    var KILL_ZONE_VELOCITY = 6;
-    var KILL_ZONE_MAX_RADIUS = 40;
-    var POWER = 30;
+    var KILL_ZONE_VELOCITY = 10;
+    var KILL_ZONE_MAX_RADIUS = 50;
+    var POWER = 20;
 
     var currentFrame = 0;
     var currentRadius;
