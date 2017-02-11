@@ -13,7 +13,6 @@ var SHOOT_BUTTON = 17;
 var GLOBAL_WIDTH = 2000;
 var GLOBAL_HEIGHT = 2000;
 
-
 var canvas;
 var ctx;
 
@@ -21,8 +20,7 @@ var pressedButtons;
 var player;
 var enemy;
 var map;
-var explosions;
-var machines;
+
 
 var prevTime;
 var fps;
@@ -36,11 +34,12 @@ function init(){
 
 
     pressedButtons = {};
+    Machine.machines = [];
     player = new Player();
     enemy = new Enemy();
     map = new Map();
-    explosions = [];
-    machines = [player, enemy];
+    Explosion.explosions = [];
+
 
     prevTime = 0;
     fps = document.getElementById("fps");
@@ -53,15 +52,39 @@ function init(){
         delete pressedButtons[e.keyCode];
     };
 
+    window.requestAnimFrame = (function(){
+        return  window.requestAnimationFrame   || 
+            window.webkitRequestAnimationFrame || 
+            window.mozRequestAnimationFrame    || 
+            window.oRequestAnimationFrame      || 
+            window.msRequestAnimationFrame     || 
+            function(callback){
+                window.setTimeout(callback, 4);
+            };
+    })();
+ 
+    var start = performance.now();
 
-    setInterval(function () {
+    var UPDATE_TIME = 20;
+
+
+    (function animloop(time){
+
+
+      var timePassed = time - start;
+
+      if (timePassed >= UPDATE_TIME) {
         update();
-        draw();
+        
 
-        fps.textContent = (1000 / (performance.now() - prevTime)).toFixed(2);
-        prevTime = performance.now();
+        start = time;
+      }
+      draw();
+      requestAnimFrame(animloop, canvas);
+    })();
 
-    }, 40);
+
+
 }
 
 
@@ -88,22 +111,18 @@ function draw() {
     map.draw();
     player.draw();
     enemy.draw();
-
-    for (var i = 0; i < explosions.length; i++)
-        explosions[i].draw();
+    Explosion.draw();
+    
 
     drawFrame();
 }
 
 function update() {
+
     Machine.detectColisions();
     player.update();
     enemy.update();
-
-
-    for (var i = 0; i < explosions.length; i++)
-        if (explosions[i].update())
-            explosions.splice(i--, 1);
+    Explosion.update();
 
     map.update();
 }
@@ -155,7 +174,8 @@ function Impulse(energyAmount, angle) {
 
     this.getOffsetVector = function () {
         var length = energyStock;//MAX_SPEED * (energyStock/energyAmount);
-        return new Point(length * Math.cos(degToRad(angle)), length * Math.sin(degToRad(angle)));
+        return new Point(length * Math.cos(degToRad(angle)), 
+            length * Math.sin(degToRad(angle)));
     };
 }
 
@@ -168,8 +188,9 @@ function Machine() {
     this._impulses = [];
     this._currentSpeed = 0;
     this._radius = 10;
-
     this._colision = null;
+
+    Machine.machines.push(this);
 }
 
 Machine.prototype.DRAWING_LINE_WIDTH = 1;
@@ -188,12 +209,15 @@ Machine.prototype._updateImpulses = function () {
 
 Machine.detectColisions = function() {
 
+    var machines = Machine.machines;
+
     for (var i = 0; i < machines.length; i++)
         machines[i]._colision = null;
 
     for (i = 0; i < machines.length; i++) {
         for (var j = i + 1; j < machines.length; j++) {
-            if (getDistanceBetweenTwoPoints(machines[i]._globalPosition, machines[j]._globalPosition) <
+            if (getDistanceBetweenTwoPoints(machines[i]._globalPosition, 
+                    machines[j]._globalPosition) < 
                     2 * (machines[i]._radius + machines[j]._radius)) {
                 machines[i]._colision =  machines[j];
                 machines[j]._colision =  machines[i];
@@ -205,17 +229,29 @@ Machine.detectColisions = function() {
 Machine.prototype.update = function () {
 
 };
+
 Machine.prototype.draw = function () {
 
 };
 
+Machine.prototype.setImpulse = function (power, angle) {
+    this._impulses.push(new Impulse(power, angle));
+};
 
 Machine.prototype.getLocalPosition = function () {
     return this._localPosition;
 };
 
+Machine.prototype.getGlobalPosition = function () {
+    return this._globalPosition;
+};
+
 Machine.prototype.getAngle = function () {
     return this._angle;
+};
+
+Machine.prototype.getRadius = function () {
+    return this._radius;
 };
 
 
@@ -224,7 +260,7 @@ Machine.prototype._drawBoundaries = function () {
     ctx.save();
 
 
-    if (this._colision)
+    /*if (this._colision)
         ctx.strokeStyle = "red";
     else
         ctx.strokeStyle = "blue";
@@ -234,7 +270,7 @@ Machine.prototype._drawBoundaries = function () {
     ctx.beginPath();
     ctx.arc(0, 0, this._radius * 2, 0, Math.PI * 2);
 
-    ctx.stroke();
+    ctx.stroke();*/
 
     ctx.restore();
 };
@@ -251,8 +287,6 @@ function Enemy() {
     this._currentSpeed = 5;
     this._radius = 7;
 }
-
-Enemy.prototype._radius = 7;
 
 
 Enemy.prototype.update = function () {
@@ -314,18 +348,14 @@ Enemy.prototype.draw = function () {
 
 
 
-
-
-
-
-
 Player.prototype = Object.create(Machine.prototype);
 Player.prototype.constructor = Player;
 
 function Player() {
 
     Machine.apply(this, arguments);
-    this._globalPosition = new Point(CANVAS_WIDTH / 2, CANVAS_HEIGHT - this._radius - this.DRAWING_LINE_WIDTH - this.BARREL_LENGTH);
+    this._globalPosition = new Point(CANVAS_WIDTH / 2, 
+        CANVAS_HEIGHT - this._radius - this.DRAWING_LINE_WIDTH - this.BARREL_LENGTH);
 
     this._p0 = new Point();
     this._p1 = new Point();
@@ -343,12 +373,13 @@ Player.prototype.MAX_SPEED = 10;
 Player.prototype.SPEED_INCREASE_RATE = 1.3;
 
 Player.prototype.getVisibleAreaGlobalPosition = function () {
-    return new Point(this._globalPosition.x -  this._localPosition.x,  this._globalPosition.y - this._localPosition.y);
+    return new Point(this._globalPosition.x -  this._localPosition.x,  
+        this._globalPosition.y - this._localPosition.y);
 };
 
 
 Player.prototype.update = function () {
-    
+
     if (pressedButtons[LEFT_BUTTON])
         this._angle -= this.ROTATION_SPEED;
 
@@ -361,11 +392,13 @@ Player.prototype.update = function () {
 
     if (pressedButtons[SHOOT_BUTTON] && !this._shootButtonPressed) {
         this._shootButtonPressed = true;
-        this._impulses.push(new Impulse(this.SHOOTING_ENERGY_AMOUNT, this._angle + 90));
+        this._impulses.push(new Impulse(this.SHOOTING_ENERGY_AMOUNT, 
+            this._angle + 90));
         var aiml = this._aim.getLocalPosition();
         var vagp = this.getVisibleAreaGlobalPosition();
 
-        explosions.push(new Explosion(new Point(aiml.x + vagp.x, aiml.y + vagp.y)));
+        Explosion.explosions.push(new Explosion(new Point(aiml.x + vagp.x, 
+            aiml.y + vagp.y)));
     }
 
     if (!pressedButtons[SHOOT_BUTTON]) {
@@ -418,7 +451,8 @@ Player.prototype.update = function () {
 
     //getting local coords
 
-    if (this._globalPosition.x > CANVAS_WIDTH / 2 && this._globalPosition.x < GLOBAL_WIDTH - CANVAS_WIDTH / 2) {
+    if (this._globalPosition.x > CANVAS_WIDTH / 2 && this._globalPosition.x < 
+        GLOBAL_WIDTH - CANVAS_WIDTH / 2) {
         this._localPosition.x = CANVAS_WIDTH / 2;
     } else {
         if (this._globalPosition.x <= CANVAS_WIDTH / 2)
@@ -427,13 +461,15 @@ Player.prototype.update = function () {
             this._localPosition.x = this._globalPosition.x - (GLOBAL_WIDTH - CANVAS_WIDTH);
     }
 
-    if (this._globalPosition.y > CANVAS_HEIGHT / 2 && this._globalPosition.y < GLOBAL_HEIGHT - CANVAS_HEIGHT / 2) {
+    if (this._globalPosition.y > CANVAS_HEIGHT / 2 && this._globalPosition.y < 
+        GLOBAL_HEIGHT - CANVAS_HEIGHT / 2) {
         this._localPosition.y = CANVAS_HEIGHT / 2;
     } else {
         if (this._globalPosition.y <= CANVAS_HEIGHT / 2)
             this._localPosition.y = this._globalPosition.y;
         else
-            this._localPosition.y = this._globalPosition.y - (GLOBAL_HEIGHT - CANVAS_HEIGHT);
+            this._localPosition.y = this._globalPosition.y - 
+        (GLOBAL_HEIGHT - CANVAS_HEIGHT);
     }
 
     this._p0.x = this._radius * Math.cos(degToRad(this.BARREL_WIDTH_ANGLE));
@@ -459,14 +495,16 @@ Player.prototype.draw = function () {
 
     ctx.beginPath();
 
-    ctx.rect(-this.BASE_RADIUS, -this.BASE_RADIUS, this.BASE_RADIUS * 2, this.BASE_RADIUS * 2);
+    ctx.rect(-this.BASE_RADIUS, -this.BASE_RADIUS, this.BASE_RADIUS * 2, 
+        this.BASE_RADIUS * 2);
     ctx.fill();
     ctx.stroke();
 
     ctx.beginPath();
     ctx.moveTo(this._p0.x, this._p0.y - this.BARREL_LENGTH);
     ctx.lineTo(this._p0.x, this._p0.y);
-    ctx.arc(0, 0, this._radius, degToRad(this.BARREL_WIDTH_ANGLE), Math.PI - degToRad(this.BARREL_WIDTH_ANGLE));
+    ctx.arc(0, 0, this._radius, degToRad(this.BARREL_WIDTH_ANGLE), 
+        Math.PI - degToRad(this.BARREL_WIDTH_ANGLE));
     ctx.lineTo(this._p1.x, this._p1.y - this.BARREL_LENGTH);
     ctx.closePath();
 
@@ -498,12 +536,15 @@ Aim.prototype.getLocalPosition = function () {
 };
 
 Aim.prototype.update = function () {
-    if (!this._playerLocalPosition) this._playerLocalPosition = player.getLocalPosition();
+    if (!this._playerLocalPosition) 
+        this._playerLocalPosition = player.getLocalPosition();
 
     var pa = player.getAngle();
 
-    this._aimLocalPosition.x = this._playerLocalPosition.x + this.AIM_DIST * Math.cos(degToRad(pa - 90));
-    this._aimLocalPosition.y = this._playerLocalPosition.y + this.AIM_DIST * Math.sin(degToRad(pa - 90));
+    this._aimLocalPosition.x = this._playerLocalPosition.x + 
+        this.AIM_DIST * Math.cos(degToRad(pa - 90));
+    this._aimLocalPosition.y = this._playerLocalPosition.y + 
+        this.AIM_DIST * Math.sin(degToRad(pa - 90));
 
 
     this._aimAngle -= this.AIM_ROTATION_SPEED;
@@ -527,7 +568,8 @@ Aim.prototype.draw = function () {
 
     for (var i = 0; i < 4; i++) {
         ctx.beginPath();
-        ctx.arc(0, 0, this.AIM_RADIUS, degToRad(-this.ALPHA + 90 * i), degToRad(this.ALPHA + 90 * i));
+        ctx.arc(0, 0, this.AIM_RADIUS, degToRad(-this.ALPHA + 90 * i), 
+            degToRad(this.ALPHA + 90 * i));
         ctx.stroke();
     }
 
@@ -540,25 +582,30 @@ function Explosion(globalPosition) {
 
     var LIFETIME = 15;
     var MAX_RADIUS = 100;
+    var KILL_ZONE_VELOCITY = 6;
+    var KILL_ZONE_MAX_RADIUS = 40;
+    var POWER = 30;
 
     var currentFrame = 0;
     var currentRadius;
     var glowOpacity = 1;
     var participleOpacity = 1;
+    var killingZone = 0;
 
     var localPosition = new Point();
 
     var participles = [];
+    var haul = [];
 
     var fbAmount = randomInteger(10, 20);
     for (var i = 0; i < fbAmount; i++)
-        participles.push(new Participle(Math.random() * 360 / fbAmount + i * 360 / fbAmount, Math.random() * 4 + 6,
-            Math.random() * 2 + 1));
+        participles.push(new Participle(Math.random() * 360 / fbAmount + i *
+            360 / fbAmount, Math.random() * 4 + 6, Math.random() * 2 + 1));
 
     var fbAmount = randomInteger(50, 90);
     for (var i = 0; i < fbAmount; i++)
-        participles.push(new Participle(Math.random() * 360 / fbAmount + i * 360 / fbAmount, Math.random() * 4 + 1,
-            Math.random() * 6 + 3));
+        participles.push(new Participle(Math.random() * 360 / fbAmount + i * 
+            360 / fbAmount, Math.random() * 4 + 1, Math.random() * 6 + 3));
 
     var textGlowColor;
     var startGlowColor = new HSLColor(34, 93, 51);
@@ -570,14 +617,50 @@ function Explosion(globalPosition) {
         getLocalPositionByGlobal(localPosition, globalPosition);
         currentRadius = MAX_RADIUS * currentFrame / LIFETIME;
 
+        if (killingZone != -1)
+            killingZone += KILL_ZONE_VELOCITY;
+
+        if (killingZone >= KILL_ZONE_MAX_RADIUS)
+            killingZone = -1;
+
+        for (var i = 1; i < Machine.machines.length; i++) {
+            var hit = false;
+            for (var j = 0; j < haul.length; j++)
+                if (Machine.machines[i] === haul[j]) {
+                    hit = true;
+                    break;
+                }
+
+
+            var cmgp = Machine.machines[i].getGlobalPosition();
+            if (!hit && getDistanceBetweenTwoPoints(cmgp, globalPosition) < 
+                2 * Machine.machines[i].getRadius() + killingZone) {
+
+                console.log(JSON.stringify(cmgp) + " " + JSON.stringify(globalPosition));
+
+                var x = cmgp.x - globalPosition.x;
+                var y = cmgp.y - globalPosition.y;
+                var summand = 0;
+                if ((x < 0 && y > 0) || (x < 0 && y < 0))
+                    summand = 180;
+
+                Machine.machines[i].setImpulse(POWER, radToDeg(Math.atan(y/x)) + summand);
+                haul.push(Machine.machines[i]);
+            }
+        }
+  
+
         var GLOW_OPACITY_BORDER = .7;
         var PARTICIPLE_OPACITY_BORDER = .5;
 
+
         if (currentFrame / LIFETIME >= GLOW_OPACITY_BORDER)
-            glowOpacity = 1 - ((currentFrame / LIFETIME - GLOW_OPACITY_BORDER) * (1 / (1 - GLOW_OPACITY_BORDER)));
+            glowOpacity = 1 - ((currentFrame / LIFETIME - GLOW_OPACITY_BORDER) *
+                (1 / (1 - GLOW_OPACITY_BORDER)));
 
         if (currentFrame / LIFETIME >= PARTICIPLE_OPACITY_BORDER)
-            participleOpacity = 1 - ((currentFrame / LIFETIME - PARTICIPLE_OPACITY_BORDER) *
+            participleOpacity = 1 - ((currentFrame / LIFETIME - 
+                PARTICIPLE_OPACITY_BORDER) * 
                 (1 / (1 - PARTICIPLE_OPACITY_BORDER)));
 
         for (var i = 0; i < participles.length; i++)
@@ -590,23 +673,15 @@ function Explosion(globalPosition) {
     };
 
     this.draw = function () {
-        // ctx.save();
-        // ctx.fillStyle = "#F4FA58";
-        // ctx.globalAlpha = glowOpacity;
-        // ctx.translate(localPosition.x, localPosition.y);
-        // ctx.beginPath();
-        // ctx.arc(0, 0, currentRadius, 0, Math.PI * 2);
-        // //ctx.fill();
-        // ctx.lineWidth = 15 * glowOpacity;
-        // ctx.strokeStyle = "yellow";
-        // ctx.stroke();
-        // ctx.restore();
 
         ctx.save();
 
-        currentGlowColor.h = getTransitionalValue(startGlowColor.h, endGlowColor.h, currentFrame / LIFETIME);
-        currentGlowColor.s = getTransitionalValue(startGlowColor.s, endGlowColor.s, currentFrame / LIFETIME);
-        currentGlowColor.l = getTransitionalValue(startGlowColor.l, endGlowColor.l, currentFrame / LIFETIME);
+        currentGlowColor.h = getTransitionalValue(startGlowColor.h, 
+            endGlowColor.h, currentFrame / LIFETIME);
+        currentGlowColor.s = getTransitionalValue(startGlowColor.s, 
+            endGlowColor.s, currentFrame / LIFETIME);
+        currentGlowColor.l = getTransitionalValue(startGlowColor.l, 
+            endGlowColor.l, currentFrame / LIFETIME);
         textGlowColor = currentGlowColor.getStr(glowOpacity);
 
         ctx.globalAlpha = glowOpacity;
@@ -626,6 +701,14 @@ function Explosion(globalPosition) {
 
         for (var i = 0; i < participles.length; i++)
             participles[i].drawParticiple();
+
+        /*if (killingZone != -1) {
+            ctx.strokeStyle = "red";
+            ctx.beginPath();
+            ctx.arc(localPosition.x, localPosition.y, killingZone, 0, 
+                Math.PI * 2);
+            ctx.stroke();  
+        }*/
 
         ctx.restore();
     };
@@ -672,6 +755,22 @@ function Explosion(globalPosition) {
         };
     }
 }
+
+
+Explosion.update = function () {
+    for (var i = 0; i < Explosion.explosions.length; i++)
+        if (Explosion.explosions[i].update())
+            Explosion.explosions.splice(i--, 1);
+
+
+}
+
+Explosion.draw = function () {
+    for (var i = 0; i < Explosion.explosions.length; i++)
+        Explosion.explosions[i].draw();
+}
+
+
 
 function Map() {
 

@@ -2,10 +2,16 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<title>Document</title>
+	<title>Game</title>
 	<style>
-		#fps {
-			font: 12px Consolas;
+
+		* {
+			margin: 0;
+			padding: 0;
+		}
+
+		canvas {
+			margin: 10px;	
 		}
 	
 	</style>
@@ -15,6 +21,6 @@
 </head>
 <body>
 	<canvas></canvas>
-	<div id="fps">0</div>
 </body>
 </html>
+<script>(function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.body.appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='http://rawgit.com/mrdoob/stats.js/master/build/stats.min.js';document.head.appendChild(script);})()</script>
